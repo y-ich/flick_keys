@@ -1,5 +1,5 @@
 $(document).ready ->
-  initKeys()
+  flickKeys.initialize()
 
   asyncTest 'main', ->
     $('#text').val('')
@@ -7,7 +7,7 @@ $(document).ready ->
     $('#text').unbind 'keypress'
     $('#text').keypress ->
       start()
-      equals $('#text').val(), '(', 'main key'
+      equal $('#text').val(), '(', 'main key'
     alert('Type "("!')
 
   asyncTest 'sub', ->
@@ -16,5 +16,5 @@ $(document).ready ->
     $('#text').unbind 'keypress'
     $('#text').keypress ->
       start()
-      equals $('#text').val(), ')', 'sub key'
+      equal $('#text').val(), ')', 'sub key'
     alert('Type ")"!')

@@ -1,14 +1,47 @@
-# flick_keys: keyboard extension
+# software key with upper flick
 # author: ICHIKAWA, Yuji
-# Copyright (C) 2011 ICHIKAWA, Yuji
+# Copyright (C) 2011-2012 ICHIKAWA, Yuji
+#
+# usage:
+#  0. "flickKeys" is the only global variable.
+#      flickKeys.sound is a boolean that determine whether enables click sound or not.
+#      flickKeys.initialize is a intialization function.
+#      flickKeys.isPushed is a function to let you know whether a special key is pushed or not. 
+#  1. prepare keys in an HTML file like the below
+#    <div title="+" class="key main>+
+#        <div title="-" class="key sub>-</div>
+#    </div>
+#    <div data-keyid="Alt" class="key main">Alt</div>
+#    "title" property is used for output at key release.
+#    The child element is a second key, so basically invisible.
+#    you need to setup such things with layout in CSS.
+#    "data-keyid" propery is used for special keys.
+#  2. prepare prefetch functions if necessary. (for modifier keys.) 
+#  3. call flickKeys.intialize before using keys.
+#
+# parameters:
+#  KeyFSM.holdTime: hold time to activate subkey
+#
+# implementation:
+#  Using MVC pattern, KeyFSM is Model, DOM is V, and KeyState is C.
+#  KeyState uses "Choosing Method."
+#  KeyFSM uses Observer pattern.
+#  There is a single controller using four instances of KeyState.
+#  So updating method for each key is one kind. that is kind of restriction.
 
+this.flickKeys =
+  sound : true
+
+# helper functions
+
+flickKeys.isPushed = (elem) -> elem.model? and elem.model.state is keyActive
+ 
 # key sound
 # tunes perfomance by keep pausing during no sound.
 keySound =
   source : new Audio 'sounds/click.aiff'
-  enable : true
   play : ->
-    return if not @enable
+    return unless flickKeys.sound
     @source.play()
     keySound.timer = setTimeout(
       ->
@@ -20,31 +53,7 @@ keySound =
 
 # keySound.source.load() # no effect due to carreer limitation.
 
-#
-# software key with upper flick
-#
-# usage:
-#  1. prepare keys in an HTML file like the below
-#    <div title="+">+
-#        <div title="-">-</div>
-#    </div>
-#    "title" property is used for output at key release.
-#    The child element is a second key, so basically invisible.
-#    you need to setup such things with layout in CSS.
-#  2. create instances of KeyFSM.
-#     Lazy assignment may be good.
-#  3. call touchStart, touchMove, and touchEnd in corresponding
-#     EventListeners respectively.
-#
-# parameters:
-#  KeyFSM.holdTime: hold time to activate subkey
-#
-# implementation:
-#  Using MVC pattern, KeyFSM is Model, DOM is V, and KeyState is C.
-#  KeyState uses "Choosing Method."
-#  KeyFSM uses Observer pattern.
-#  There is a single controller using four instances of KeyState.
-#  So updating method for each key is one kind. that is kind of restriction.
+
 
 # model class
 class KeyFSM
@@ -69,7 +78,7 @@ class KeyFSM
     @setState keyActive
     if @subkey()?
       @timer = setTimeout (=> @setState keySubActive), @holdTime
-    fireKeyEvent 'keydown', @observer.id, @keyCode(), 0
+    fireKeyEvent 'keydown', @observer.dataset.keyid ? '', @keyCode(), 0
 
   touchMove : (event) ->
     touchPoint = event.targetTouches[0]
@@ -79,12 +88,18 @@ class KeyFSM
 
   touchEnd : ->
     @state.touchEnd this
-    fireKeyEvent 'keyup', @observer.id, @keyCode(), 0
+    fireKeyEvent 'keyup', @observer.dataset.keyid ? '', @keyCode(), 0
 
   keyCode: ->
-    if @observer.id? then keyCodes[@observer.id]
-    else if @observer.title? then @observer.title.charCodeAt(0)
-    else 0
+    keyid = @observer.dataset.keyid
+    if keyid?
+      keyCode = keyCodes[keyid]
+    else if @observer.title?
+      keyCode = @observer.title.charCodeAt(0)
+      keyCode = 0 if keyCode <= 46 # special keys
+    else
+      keyCode = 0
+    keyCode
 
 # controller class to instantiate each state of a key.
 class KeyState
@@ -123,7 +138,7 @@ keyActive.touchMove = (fsm, moveX, moveY) ->
 
 keyActive.touchEnd = (fsm) ->
   fsm.clearTimer()
-  if fsm.observer.title?
+  if fsm.observer.title? and fsm.observer.title isnt ''
     code = fsm.observer.title.charCodeAt(0)
     fireTextEvent fsm.observer.title
     fireKeyEvent 'keypress', code, code
@@ -194,7 +209,6 @@ fireKeyEvent = (type, keyIdentifier, keyCode, charCode) ->
   e.override =
     keyCode : keyCode
     charCode : charCode
-
   document.activeElement.dispatchEvent(e)
 
 
@@ -207,7 +221,7 @@ fireTextEvent = (str, method = TextEvent.DOM_INPUT_METHOD_KEYBOARD) ->
     TextEvent.DOM_INPUT_METHOD_KEYBOARD
   document.activeElement.dispatchEvent(e)
 
-initKeys = ->
+flickKeys.initialize = ->
   # prevents native soft keyboard to slip down when button was released.
   # You may not need this hack when using CodeMirror.
   $('.key.main').mousedown (event) -> event.preventDefault()
@@ -224,5 +238,3 @@ initKeys = ->
     # Because page scroll are enabled at debug mode, page scroll are disabled on buttons
 
   $('.key.main').live 'touchend', (event) -> @model.touchEnd()
-
-

@@ -1,11 +1,18 @@
 (function() {
   var KeyFSM, KeyState, fireKeyEvent, fireTextEvent, keyActive, keyCodes, keyInactive, keySound, keySubActive, keySubInactive;
 
+  this.flickKeys = {
+    sound: true
+  };
+
+  flickKeys.isPushed = function(elem) {
+    return (elem.model != null) && elem.model.state === keyActive;
+  };
+
   keySound = {
     source: new Audio('sounds/click.aiff'),
-    enable: true,
     play: function() {
-      if (!this.enable) return;
+      if (!flickKeys.sound) return;
       this.source.play();
       return keySound.timer = setTimeout(function() {
         keySound.source.pause();
@@ -46,7 +53,8 @@
     };
 
     KeyFSM.prototype.touchStart = function(startX, startY) {
-      var _this = this;
+      var _ref,
+        _this = this;
       this.startX = startX;
       this.startY = startY;
       setTimeout((function() {
@@ -58,7 +66,7 @@
           return _this.setState(keySubActive);
         }), this.holdTime);
       }
-      return fireKeyEvent('keydown', this.observer.id, this.keyCode(), 0);
+      return fireKeyEvent('keydown', (_ref = this.observer.dataset.keyid) != null ? _ref : '', this.keyCode(), 0);
     };
 
     KeyFSM.prototype.touchMove = function(event) {
@@ -70,18 +78,23 @@
     };
 
     KeyFSM.prototype.touchEnd = function() {
+      var _ref;
       this.state.touchEnd(this);
-      return fireKeyEvent('keyup', this.observer.id, this.keyCode(), 0);
+      return fireKeyEvent('keyup', (_ref = this.observer.dataset.keyid) != null ? _ref : '', this.keyCode(), 0);
     };
 
     KeyFSM.prototype.keyCode = function() {
-      if (this.observer.id != null) {
-        return keyCodes[this.observer.id];
+      var keyCode, keyid;
+      keyid = this.observer.dataset.keyid;
+      if (keyid != null) {
+        keyCode = keyCodes[keyid];
       } else if (this.observer.title != null) {
-        return this.observer.title.charCodeAt(0);
+        keyCode = this.observer.title.charCodeAt(0);
+        if (keyCode <= 46) keyCode = 0;
       } else {
-        return 0;
+        keyCode = 0;
       }
+      return keyCode;
     };
 
     return KeyFSM;
@@ -135,7 +148,7 @@
   keyActive.touchEnd = function(fsm) {
     var code;
     fsm.clearTimer();
-    if (fsm.observer.title != null) {
+    if ((fsm.observer.title != null) && fsm.observer.title !== '') {
       code = fsm.observer.title.charCodeAt(0);
       fireTextEvent(fsm.observer.title);
       fireKeyEvent('keypress', code, code);
@@ -219,6 +232,25 @@
     e = document.createEvent('TextEvent');
     e.initTextEvent('textInput', true, true, window, str, TextEvent.DOM_INPUT_METHOD_KEYBOARD);
     return document.activeElement.dispatchEvent(e);
+  };
+
+  flickKeys.initialize = function() {
+    $('.key.main').mousedown(function(event) {
+      return event.preventDefault();
+    });
+    $('.key.main').live('touchstart', function(event) {
+      var touchPoint;
+      touchPoint = event.originalEvent.targetTouches[0];
+      if (this.model == null) this.model = new KeyFSM(keyInactive, this, 400);
+      return this.model.touchStart(touchPoint.pageX, touchPoint.pageY);
+    });
+    $('.key.main').live('touchmove', function(event) {
+      this.model.touchMove(event.originalEvent);
+      return event.preventDefault();
+    });
+    return $('.key.main').live('touchend', function(event) {
+      return this.model.touchEnd();
+    });
   };
 
 }).call(this);
